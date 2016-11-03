@@ -2,6 +2,7 @@
  * Created by mark on 2016-11-01.
  */
 
+import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.net.DatagramPacket;
@@ -19,11 +20,10 @@ import java.util.Random;
  *         This example is adapted from Kurose & Ross
  */
 public class DNSlookup {
-    
-    
     static final int MIN_PERMITTED_ARGUMENT_COUNT = 2;
     static boolean tracingOn = false;
     static InetAddress rootNameServer;
+    static byte queryID;
     
     // sends a query (to root name server as of now) where
     // - address is ip address of name server
@@ -38,28 +38,35 @@ public class DNSlookup {
         socket.send(packet);
     }
     
-    public static void receiveQuery(DatagramSocket socket) throws IOException {
+    public static void receiveQuery(DatagramSocket socket, DNSResponse response) throws IOException {
+        ByteArrayInputStream inputStream;
         // RECEIVIN' DA PACKAGE..
         // **** if no response within 5 secs, resend packet *****
         // ******** if still no response, throw exception/print error code
         // *********** MAKE SURE TO CHECK THAT RECEIVED PACKET IS NOT TRUNCATED *********
         // *********** IF TRUNCATED (IF PAYLOAD WAS TOO LARGE FOR PACKET) THROW SOME ERROR *********
-        byte[] buf = new byte[1023];
+        byte[] buf = new byte[1028];
         DatagramPacket packet = new DatagramPacket(buf, buf.length);
         boolean transactionSuccess = false;
         while (transactionSuccess) {
             // if transaction id from response is different from query, discard response and
             // start receiving again
             socket.receive(packet);
-            
+            inputStream = new ByteArrayInputStream(packet.getData());
+            byte rQueryID = (byte) inputStream.read();
+            if (rQueryID == queryID) {
+                transactionSuccess = true;
+            }
         }
+        byte[] data = packet.getData();
+        response = new DNSResponse(data, data.length);
     }
     
     public static byte[] convertDomainNameToDNSQuery(String fqdn) throws IOException {
         ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
         // Creates a random queryID between 0 - (2^16 - 1) inclusive
         Random r = new Random();
-        byte queryID = (byte) r.nextInt(65535);
+        queryID = (byte) r.nextInt(65535);
         byte[] prefix = {queryID, (byte) 0x00, (byte) 0x00, (byte) 0x00, (byte) 0x01, (byte) 0x00,
             (byte) 0x00, (byte) 0x00, (byte) 0x00, (byte) 0x00, (byte) 0x00};
         outputStream.write(prefix);
@@ -91,7 +98,7 @@ public class DNSlookup {
      */
     public static void main(String[] args) throws Exception {
         String fqdn;
-        DNSResponse response; // Just to force compilation
+        DNSResponse response = null; // Just to force compilation
         int argCount = args.length;
         
         if (argCount < 2 || argCount > 3) {
@@ -110,7 +117,7 @@ public class DNSlookup {
              DatagramSocket socket = new DatagramSocket();
              ) {
             sendQuery(socket, rootNameServer, fqdn);
-            receiveQuery(socket);
+            receiveQuery(socket, response);
         } catch (SocketException e) {
             //do something
         } catch (IOException e) {
