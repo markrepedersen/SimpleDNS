@@ -58,7 +58,7 @@ public class DNSlookup {
             }
         }
         byte[] data = packet.getData();
-        if ((data[3] & 0b0000_0010) == 0b0000_0010) { //response is truncated
+        if ((data[2] & 0b0000_0010) == 0b0000_0010) { //response is truncated
             // report error
         }
         return new DNSResponse(data, data.length);
@@ -126,7 +126,7 @@ public class DNSlookup {
                             if (record.getType() == 0x05 && record.getName().equals(fqdn)) {
                                 // checks if there is a CNAME record that corresponds to the FQDN you were looking for,
                                 // and if so repeats the process (recursively) with that name
-                                fqdn = DNSResponse.readFQDN(record.getRData(), 0);
+                                fqdn = DNSResponse.readFQDN(response.getData(), record.getRData(), 0);
                                 rootNameServer = InetAddress.getByName(args[0]);
                             }
                             else {
@@ -149,7 +149,7 @@ public class DNSlookup {
                         }
                         else {
                             // no match in additional section, must look up ns in a new query
-                            String nsFQDN = DNSResponse.readFQDN(response.getFirstNSRecord().getRData(), 0);
+                            String nsFQDN = DNSResponse.readFQDN(response.getData(), response.getFirstNSRecord().getRData(), 0);
                             sendQuery(socket, InetAddress.getByName(args[0]), nsFQDN);
                             DNSResponse newQuery = receiveResponse(socket);
                         }

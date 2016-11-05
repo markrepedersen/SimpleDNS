@@ -88,7 +88,7 @@ public class DNSResponse {
         if (additionalCount != 0) {
             for (ResourceRecord nsRecord : nsRecords) {
                 for (ResourceRecord adRecords : additionalRecords) {
-                    if (DNSResponse.readFQDN(nsRecord.getRData(), 0).equals(adRecords.getName())) {
+                    if (DNSResponse.readFQDN(data, nsRecord.getRData(), 0).equals(adRecords.getName())) {
                         return adRecords;
                     }
                 }
@@ -163,6 +163,9 @@ public class DNSResponse {
                 isOnPointer = false;
                 pos = lastPos;      // else return to last position
                 rdata = lastRData;
+                if (pos >= rdata.length) {
+                    break;
+                }
             }
             
             else if ((rdata[pos] & 0b1100_0000) == (byte) 0x00) { // regular label
@@ -180,10 +183,10 @@ public class DNSResponse {
                 if (!isOnPointer) {
                     lastPos = pos + 2;
                 }
+                pos = (((rdata[pos] & 0b0011_1111) & 0xff) << 8) | (rdata[pos + 1] & 0xff);
                 lastRData = rdata;
                 rdata = data;
                 isOnPointer = true;
-                pos = (((rdata[pos] & 0b0011_1111) & 0xff) << 8) | (rdata[pos + 1] & 0xff);
             }
         }
         position = pos;
