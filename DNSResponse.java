@@ -4,6 +4,7 @@
 
 import java.io.ByteArrayInputStream;
 import java.net.InetAddress;
+import java.net.UnknownHostException;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.List;
@@ -20,7 +21,10 @@ import java.util.List;
 
 public class DNSResponse {
     private List<ResourceRecord> resourceRecords = new ArrayList<>();
-    private int position = 0;
+    private List<ResourceRecord> ansRecords = new ArrayList<>();    // a and aaaa records
+    private List<ResourceRecord> nsRecords = new ArrayList<>();
+    private List<ResourceRecord> additionalRecords = new ArrayList<>();
+    private static int position = 0;
     private int queryID;                  // this is for the response it must match the one in the request
     private String qName;
     private int QDCount;
@@ -43,8 +47,56 @@ public class DNSResponse {
         return resourceRecords;
     }
     
+    public boolean isAuthoritative() {
+        return authoritative;
+    }
+    
+    public int getNsCount() {
+        return nsCount;
+    }
+    
+    public int getAdditionalCount() {
+        return additionalCount;
+    }
+    
+    public int getAnswerCount() {
+        return answerCount;
+    }
+    
+    public ResourceRecord getFirstNSRecord() {
+        return nsRecords.get(0);
+    }
+    
+    public List<ResourceRecord> getAnsRecords() {
+        return ansRecords;
+    }
+    
+    public List<ResourceRecord> getAdditionalRecords() {
+        return additionalRecords;
+    }
+    
+    public List<ResourceRecord> getNsRecords() {
+        return nsRecords;
+    }
+    
+    // if a name server is found and its address is in additional section, return this record
+    // return any ns if no mapping found
+    // O(n^2) performance can hopefully be ignored, since only small amount of records
+    public ResourceRecord selectNameServer() {
+        if (additionalCount != 0) {
+            for (ResourceRecord nsRecord : nsRecords) {
+                for (ResourceRecord adRecords : additionalRecords) {
+                    if (DNSResponse.readFQDN(nsRecord.getRData(), 0).equals(adRecords.getName())) {
+                        return adRecords;
+                    }
+                }
+            }
+        }
+        return null;
+    }
+    
     //Helper method for reading the sequence of bytes interpreted as the FQDN
-    public String readFQDN(byte[] data, int start) {
+    public static String readFQDN(byte[] data, int start) {
         byte[] buf = new byte[255]; // buffer representing a fqdn with length max size of a domain name
         int endOfBuffer = 0; // the first empty position in buffer
         int amountToRead;   // the integer before a label indicating how long the label is
@@ -79,8 +131,6 @@ public class DNSResponse {
             }
         }
         position = pos;
-        
-        // goddamn this code is atrocious
         int count = 0;
         for (int i = 0; i < buf.length; i++) {
             if (buf[i] == 0) {
@@ -137,35 +187,37 @@ public class DNSResponse {
         QClass = ((data[position] << 8) + (data[position + 1] & 0xff));
         position += 2;
         for (int i = 0; i < answerCount; i++) {
-            addRecord(data, position);
+            addRecord(data, position, ansRecords);
         }
         for (int i = 0; i < nsCount; i++) {
-            addRecord(data, position);
+            addRecord(data, position, nsRecords);
         }
         for (int i = 0; i < additionalCount; i++) {
-            addRecord(data, position);
+            addRecord(data, position, additionalRecords);
         }
+        position = 0;
     }
     
-    public void addRecord(byte[] data, int position) {
-        String name = readFQDN(data, position); //this method already increments position for us
-        position = this.position - 1;
-        int type = ((data[position] << 8) + (data[position + 1] & 0xff));
-        position += 2;
-        int clss = ((data[position] << 8) + (data[position + 1] & 0xff));
-        position += 2;
-        byte[] newInt = {data[position], data[position + 1], data[position + 2], data[position + 3]};
+    private void addRecord(byte[] data, int position1, List<ResourceRecord> list) {
+        String name = readFQDN(data, position1); //this method already increments position for us
+        position1 = position - 1;
+        int type = ((data[position1] << 8) + (data[position1 + 1] & 0xff));
+        position1 += 2;
+        int clss = ((data[position1] << 8) + (data[position1 + 1] & 0xff));
+        position1 += 2;
+        byte[] newInt = {data[position1], data[position1 + 1], data[position1 + 2], data[position1 + 3]};
         int ttl = ByteBuffer.wrap(newInt).getInt();
-        position += 4;
-        int RDLength = ((data[position] << 8) + (data[position + 1] & 0xff));
-        position += 2;
+        position1 += 4;
+        int RDLength = ((data[position1] << 8) + (data[position1 + 1] & 0xff));
+        position1 += 2;
         byte[] RData = new byte[RDLength];
         for (int j = 0; j < RDLength; j++) {
-            RData[j] = data[position];
-            position++;
+            RData[j] = data[position1];
+            position1++;
         }
+        list.add(new ResourceRecord(name, type, clss, ttl, RDLength, RData));
         resourceRecords.add(new ResourceRecord(name, type, clss, ttl, RDLength, RData));
-        this.position = position;
+        position = position1;
     }
     
     
