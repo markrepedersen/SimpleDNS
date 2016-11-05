@@ -22,10 +22,12 @@ import java.util.regex.Pattern;
  *         This example is adapted from Kurose & Ross
  */
 public class DNSlookup {
-    static final int MIN_PERMITTED_ARGUMENT_COUNT = 2;
-    static boolean tracingOn = false;
-    static InetAddress rootNameServer;
-    static int queryID;
+    private static final int MIN_PERMITTED_ARGUMENT_COUNT = 2;
+    private static boolean tracingOn = false;
+    private static InetAddress rootNameServer;
+    private static int queryID;
+    private static int MAX_NUM_QUERIES = 30;
+    private static InetAddress nameServer;
     
     // sends a query (to root name server as of now) where
     // - address is ip address of name server
@@ -33,13 +35,13 @@ public class DNSlookup {
     // - port number is 53 by default
     // user of this method must handle both exceptions: SocketException, IOException
     // returns the server's response
-    public static void sendQuery(DatagramSocket socket, InetAddress address, String fqdn) throws SocketException, IOException {
+    private static void sendQuery(DatagramSocket socket, InetAddress address, String fqdn) throws SocketException, IOException {
         byte[] dnsQuery = convertDomainNameToDNSQuery(fqdn);
         DatagramPacket packet = new DatagramPacket(dnsQuery, dnsQuery.length, address, 53);
         socket.send(packet);
     }
     
-    public static DNSResponse receiveResponse(DatagramSocket socket) throws IOException {
+    private static DNSResponse receiveResponse(DatagramSocket socket) throws IOException {
         // **** if no response within 5 secs, resend packet *****
         // ******** if still no response, throw exception/print error code
         // if truncated send error
@@ -64,7 +66,7 @@ public class DNSlookup {
         return new DNSResponse(data, data.length);
     }
     
-    public static byte[] convertDomainNameToDNSQuery(String fqdn) throws IOException {
+    private static byte[] convertDomainNameToDNSQuery(String fqdn) throws IOException {
         ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
         // Creates a random queryID between 0 - (2^16 - 1) inclusive
         Random r = new Random();
@@ -113,26 +115,37 @@ public class DNSlookup {
         try (
              DatagramSocket socket = new DatagramSocket();
              ) {
+            int queryCount = 0;
             sendQuery(socket, rootNameServer, fqdn);
-            DNSResponse response = receiveResponse(socket);
-            List<ResourceRecord> records = response.getRecords();
-            for (ResourceRecord record : records) {
-                if (record.getType() == 0x01 && record.getName().equals(fqdn)) {
-                    // check if there is a record with the proper type that corresponds to the FQDN you were looking for
+            while (queryCount != MAX_NUM_QUERIES) {
+                if (queryCount > 0) {
+                    sendQuery(socket, nameServer, fqdn);
                 }
-                
-                else if (record.getType() == 0x05 && record.getName().equals(fqdn)) {
-                    // if not, check if there is a CNAME record that corresponds to the FQDN you were looking for,
-                    // and if so repeat the process (recursively) with that name
+                DNSResponse response = receiveResponse(socket);
+                List<ResourceRecord> records = response.getRecords();
+                for (ResourceRecord record : records) {
+                    if (record.getType() == 0x01 && record.getName().equals(fqdn)) {
+                        // checks if there is a record with the proper type that corresponds to the FQDN you were looking for
+                        if (!tracingOn) {
+                            // if user didn't input -t
+                            System.out.printf("%s %d %s", fqdn, record.getTTL(), InetAddress.getByAddress(record.getRData()).getHostAddress());
+                        }
+                        else {
+                            // if user input -t
+                        }
+                        
+                    } else if (record.getType() == 0x05 && record.getName().equals(fqdn)) {
+                        // checks if there is a CNAME record that corresponds to the FQDN you were looking for,
+                        // and if so repeats the process (recursively) with that name
+                    } else {
+                        // selects a potential nameserver, and if its address is in the additional
+                        // information (or is known to you through other means), repeat the query (recursively) to this new nameserver;
+                        // if the address of the nameserver is unknown, make a new query for the nameserver's name (recursively) using
+                        // the root nameserver, then use the result as a nameserver to repeat the original query (recursively);
+                        // if there is no nameserver, return an error.
+                    }
                 }
-                
-                else {
-                    // if not, select a potential nameserver, and if its address is in the additional
-                    // information (or is known to you through other means), repeat the query (recursively) to this new nameserver;
-                    // if the address of the nameserver is unknown, make a new query for the nameserver's name (recursively) using
-                    // the root nameserver, then use the result as a nameserver to repeat the original query (recursively);
-                    // if there is no nameserver, return an error.
-                }
+                queryCount++;
             }
         } catch (SocketException e) {
             //do something
