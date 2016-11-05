@@ -26,7 +26,7 @@ public class DNSlookup {
     private static int MAX_NUM_QUERIES = 30;
     private static InetAddress nameServer;
     private static int numTimeOuts = 0;
-	private static String nameBeingLookUp;
+    private static String nameBeingLookUp;
     
     // sends a query (to root name server as of now) where
     // - address is ip address of name server
@@ -39,10 +39,8 @@ public class DNSlookup {
         DatagramPacket packet = new DatagramPacket(dnsQuery, dnsQuery.length, address, 53);
         socket.send(packet);
     }
-    
-    
-    private static String hostAddressString(String name ) throws UnknownHostException{
-		
+
+    private static String hostAddressString(String name ) throws UnknownHostException{		
     	String IP=InetAddress.getByName(name).toString().split(name, '/')[1];
 		IP=IP.substring(1);
     	return IP;
@@ -89,7 +87,7 @@ public class DNSlookup {
 
     	
 	}
-    
+
     private static DNSResponse receiveResponse(DatagramSocket socket) throws IOException {
         // **** if no response within 5 secs, resend packet *****
         // ******** if still no response, throw exception/print error code
@@ -113,24 +111,11 @@ public class DNSlookup {
             // report error
         }
         
-        //for(int i=0; i<data.length; i++){
-    	System.out.println("Rcode "+data[3]);
-    	
-    	try {
-			checkRcode(data);
-		} catch (Exception e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		}
-
-       // }
-        
+        checkRcode(data);
         return new DNSResponse(data, data.length);
     }
     
-
-
-	private static byte[] convertDomainNameToDNSQuery(String fqdn) throws IOException {
+    private static byte[] convertDomainNameToDNSQuery(String fqdn) throws IOException {
         ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
         // Creates a random queryID between 0 - (2^16 - 1) inclusive
         Random r = new Random();
@@ -172,6 +157,7 @@ public class DNSlookup {
         rootNameServer = InetAddress.getByName(args[0]);
         fqdn = args[1];
         nameBeingLookUp=args[1];
+        
         if (argCount == 3 && args[2].equals("-t"))
             tracingOn = true;
         
@@ -183,7 +169,6 @@ public class DNSlookup {
             // else SocketTimeOutException thrown
             socket.setSoTimeout(5000);
             int queryCount = 0;
-            
             while (queryCount != MAX_NUM_QUERIES) {
                 sendQuery(socket, rootNameServer, fqdn);
                 try {
@@ -193,7 +178,7 @@ public class DNSlookup {
                             if (record.getType() == 0x05 && record.getName().equals(fqdn)) {
                                 // checks if there is a CNAME record that corresponds to the FQDN you were looking for,
                                 // and if so repeats the process (recursively) with that name
-                                fqdn = DNSResponse.readFQDN(record.getRData(), 0);
+                                fqdn = DNSResponse.readFQDN(response.getData(), record.getRData(), 0);
                                 rootNameServer = InetAddress.getByName(args[0]);
                             }
                             else {
@@ -216,7 +201,7 @@ public class DNSlookup {
                         }
                         else {
                             // no match in additional section, must look up ns in a new query
-                            String nsFQDN = DNSResponse.readFQDN(response.getFirstNSRecord().getRData(), 0);
+                            String nsFQDN = DNSResponse.readFQDN(response.getData(), response.getFirstNSRecord().getRData(), 0);
                             sendQuery(socket, InetAddress.getByName(args[0]), nsFQDN);
                             DNSResponse newQuery = receiveResponse(socket);
                         }
@@ -242,7 +227,6 @@ public class DNSlookup {
         } catch (IOException e) {
             //do something
         }
-          
         
     }
     
@@ -255,4 +239,3 @@ public class DNSlookup {
         System.out.println("       -t      -trace the queries made and responses received");
     }
 }
-
