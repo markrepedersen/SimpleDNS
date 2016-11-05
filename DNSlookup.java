@@ -40,48 +40,42 @@ public class DNSlookup {
         socket.send(packet);
     }
 
-    private static String hostAddressString(String name ) throws UnknownHostException{		
-    	String IP=InetAddress.getByName(name).toString().split(name, '/')[1];
-		IP=IP.substring(1);
-    	return IP;
-    	
-    }
-    
+  
     //Check for specific Rcode errors
     private static void checkRcode(byte[] data) throws UnknownHostException  {
 		
 		if((data[3]& 0b0000_1111) == 0b0000_0001){
 			//Format error - 
 			//The name server was unable to interpret the query.
-			System.out.println(nameBeingLookUp+ " -4 " +hostAddressString(nameBeingLookUp));
+			System.out.println(nameBeingLookUp+ " -4 " +"0.0.0.0");
 			throw new Error();	
 			
 		}
 		if((data[3]& 0b0000_1111) == 0b0000_0010){
 			//Server failure - 
 			//The name server was unable to process this query due to a problem with the name server.
-			System.out.println(nameBeingLookUp+ " -4 " +hostAddressString(nameBeingLookUp));
+			System.out.println(nameBeingLookUp+ " -4 " +"0.0.0.0");
 			throw new Error();	
 		}
 		if((data[3]& 0b0000_1111) == 0b0000_0011){
 			//Name Error - 
 			//Meaningful only for responses from an authoritative name server, 
 			//this code signifies that the domain name referenced in the query does not exist
-			System.out.println(nameBeingLookUp+ " -1 " +hostAddressString(nameBeingLookUp));
+			System.out.println(nameBeingLookUp+ " -1 " +"0.0.0.0");
 			throw new Error();		
 		}
 		
 		if((data[3]& 0b0000_1111) == 0b0000_0100){
 			//Not Implemented - 
 			//The name server does not support the requested kind of query.
-			System.out.println(nameBeingLookUp+ " -4 " +hostAddressString(nameBeingLookUp));
+			System.out.println(nameBeingLookUp+ " -4 " +"0.0.0.0");
 			throw new Error();	
 			
 		}
 		if((data[3]& 0b0000_1111) == 0b0000_0101){
 			//Refused - 
 			//The name server refuses to perform the specified operation for policy reasons. 
-			System.out.println(nameBeingLookUp+ " -4 " +hostAddressString(nameBeingLookUp));
+			System.out.println(nameBeingLookUp+ " -4 " +"0.0.0.0");
 			throw new Error();	
 		}
 
@@ -209,7 +203,7 @@ public class DNSlookup {
                     queryCount++;
                     //Throw error is queryCount exceeds MAX 
                     if (queryCount>MAX_NUM_QUERIES){
-            			System.out.println(nameBeingLookUp+ " -3 " +hostAddressString(nameBeingLookUp));
+            			System.out.println(nameBeingLookUp+ " -3 " +"0.0.0.0");
             			throw new Error();	
                     }
                 }
@@ -218,7 +212,7 @@ public class DNSlookup {
                     // resend the query to the same name server. If you still don't get a response
                     // you are to indicate that the name could not be looked up by reporting a TTL of -2 and host ID of 0.0.0.0
                     if (numTimeOuts == 2) {
-            			System.out.println(nameBeingLookUp+ " -2 " +hostAddressString(nameBeingLookUp));
+            			System.out.println(nameBeingLookUp+ " -2 " +"0.0.0.0");
             			throw new Error();	
 /*                        System.out.printf("%s -2 0.0.0.0", fqdn);
                         break;*/
