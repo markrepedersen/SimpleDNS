@@ -32,11 +32,15 @@ public class DNSResponse {
     private int QType;
     private int QClass;
     long startTime;
+   
     
+   //Sets system time to check against
    public void setTime(){
 	   startTime = System.currentTimeMillis();
     }
+  
    
+  //Checks against last set to see if 500ms has passed 
   public boolean isExpiredTime(){
 	
 	 if( System.currentTimeMillis()-startTime<500){
