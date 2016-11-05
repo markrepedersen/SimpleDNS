@@ -9,7 +9,9 @@ import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 import java.net.InetAddress;
 import java.net.SocketException;
+import java.util.List;
 import java.util.Random;
+import java.util.regex.Pattern;
 
 /**
  *
@@ -23,7 +25,7 @@ public class DNSlookup {
     static final int MIN_PERMITTED_ARGUMENT_COUNT = 2;
     static boolean tracingOn = false;
     static InetAddress rootNameServer;
-    static byte queryID;
+    static int queryID;
     
     // sends a query (to root name server as of now) where
     // - address is ip address of name server
@@ -32,65 +34,61 @@ public class DNSlookup {
     // user of this method must handle both exceptions: SocketException, IOException
     // returns the server's response
     public static void sendQuery(DatagramSocket socket, InetAddress address, String fqdn) throws SocketException, IOException {
-        // SENDIN' DA PACKAGE..
-        byte[] ip = convertDomainNameToDNSQuery(fqdn);
-        DatagramPacket packet = new DatagramPacket(ip, ip.length, address, 53);
+        byte[] dnsQuery = convertDomainNameToDNSQuery(fqdn);
+        DatagramPacket packet = new DatagramPacket(dnsQuery, dnsQuery.length, address, 53);
         socket.send(packet);
     }
     
-    public static void receiveQuery(DatagramSocket socket, DNSResponse response) throws IOException {
-        ByteArrayInputStream inputStream;
-        // RECEIVIN' DA PACKAGE..
+    public static DNSResponse receiveResponse(DatagramSocket socket) throws IOException {
         // **** if no response within 5 secs, resend packet *****
         // ******** if still no response, throw exception/print error code
-        // *********** MAKE SURE TO CHECK THAT RECEIVED PACKET IS NOT TRUNCATED *********
-        // *********** IF TRUNCATED (IF PAYLOAD WAS TOO LARGE FOR PACKET) THROW SOME ERROR *********
-        byte[] buf = new byte[1028];
+        // if truncated send error
+        
+        byte[] buf = new byte[512];
         DatagramPacket packet = new DatagramPacket(buf, buf.length);
         boolean transactionSuccess = false;
-        while (transactionSuccess) {
+        while (!transactionSuccess) {
             // if transaction id from response is different from query, discard response and
             // start receiving again
             socket.receive(packet);
-            inputStream = new ByteArrayInputStream(packet.getData());
-            byte rQueryID = (byte) inputStream.read();
+            byte[] data = packet.getData();
+            int rQueryID = ((data[0] << 8) + (data[1] & 0xff));
             if (rQueryID == queryID) {
                 transactionSuccess = true;
             }
         }
         byte[] data = packet.getData();
-        response = new DNSResponse(data, data.length);
+        if ((data[3] & 0b0000_0010) == 0b0000_0010) { //response is truncated
+            // report error
+        }
+        return new DNSResponse(data, data.length);
     }
     
     public static byte[] convertDomainNameToDNSQuery(String fqdn) throws IOException {
         ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
         // Creates a random queryID between 0 - (2^16 - 1) inclusive
         Random r = new Random();
-        queryID = (byte) r.nextInt(65535);
-        byte[] prefix = {queryID, (byte) 0x00, (byte) 0x00, (byte) 0x00, (byte) 0x01, (byte) 0x00,
+        byte[] query = new byte[2];
+        r.nextBytes(query);
+        queryID = ((query[0] << 8) + (query[1] & 0xff));
+        System.out.println(queryID);
+        
+        byte[] prefix = {query[0], query[1], (byte) 0x00, (byte) 0x00, (byte) 0x00, (byte) 0x01, (byte) 0x00,
             (byte) 0x00, (byte) 0x00, (byte) 0x00, (byte) 0x00, (byte) 0x00};
         outputStream.write(prefix);
-        convertToByteArray(outputStream, fqdn.split("."));
+        String[] strings = fqdn.split(Pattern.quote("."));
+        convertToByteArray(outputStream, strings);
         byte[] postfix = {(byte) 0x00, (byte) 0x00, (byte) 0x01, (byte) 0x00, (byte) 0x01};
         outputStream.write(postfix);
         return outputStream.toByteArray();
     }
     
-    private static byte[] convertToByteArray(ByteArrayOutputStream outputStream, String[] strings) throws IOException {
-        byte[] data = new byte[strings.length];
-        
-        String[] dnsQueryString = new String[strings.length * 2];
-        for (int i = 0, j = 0; i < strings.length; i++, j = j + 2) {
-            String string = strings[i];
-            dnsQueryString[j] = String.valueOf(string.length());
-            dnsQueryString[j + 1] = string;
+    private static void convertToByteArray(ByteArrayOutputStream outputStream, String[] strings) throws IOException {
+        for (int i = 0; i < strings.length; i++) {
+            byte len = (byte) strings[i].length();
+            outputStream.write(len);
+            outputStream.write(strings[i].getBytes());
         }
-        
-        for (int i = 0; i < dnsQueryString.length; i++) {
-            String string = dnsQueryString[i];
-            outputStream.write(string.getBytes());
-        }
-        return outputStream.toByteArray();
     }
     
     /**
@@ -98,7 +96,6 @@ public class DNSlookup {
      */
     public static void main(String[] args) throws Exception {
         String fqdn;
-        DNSResponse response = null; // Just to force compilation
         int argCount = args.length;
         
         if (argCount < 2 || argCount > 3) {
@@ -117,7 +114,13 @@ public class DNSlookup {
              DatagramSocket socket = new DatagramSocket();
              ) {
             sendQuery(socket, rootNameServer, fqdn);
-            receiveQuery(socket, response);
+            DNSResponse response = receiveResponse(socket);
+            List<ResourceRecord> records = response.getRecords();
+            for (ResourceRecord record : records) {
+                if (record.getType() == 0x01 && record.getName().equals(fqdn)) {
+                    
+                }
+            }
         } catch (SocketException e) {
             //do something
         } catch (IOException e) {
