@@ -15,10 +15,17 @@ public class ResourceRecord {
         return type;
     }
 
+    public byte[] getRData() {
+        return rData;
+    }
+
     public String getName() {
         return name;
     }
 
+    public int getTTL() {
+        return ttl;
+    }
     public ResourceRecord(String name, int type, int clss, int ttl, int RDLength, byte[] rData) {
         this.name = name;
         this.type = type;
