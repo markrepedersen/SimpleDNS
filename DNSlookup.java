@@ -207,14 +207,21 @@ public class DNSlookup {
                         }
                     }
                     queryCount++;
+                    //Throw error is queryCount exceeds MAX 
+                    if (queryCount>MAX_NUM_QUERIES){
+            			System.out.println(nameBeingLookUp+ " -3 " +hostAddressString(nameBeingLookUp));
+            			throw new Error();	
+                    }
                 }
                 catch (SocketTimeoutException e) {
                     // If you send a query and don't get a response in 5 seconds you are to
                     // resend the query to the same name server. If you still don't get a response
                     // you are to indicate that the name could not be looked up by reporting a TTL of -2 and host ID of 0.0.0.0
                     if (numTimeOuts == 2) {
-                        System.out.printf("%s -2 0.0.0.0", fqdn);
-                        break;
+            			System.out.println(nameBeingLookUp+ " -2 " +hostAddressString(nameBeingLookUp));
+            			throw new Error();	
+/*                        System.out.printf("%s -2 0.0.0.0", fqdn);
+                        break;*/
                     }
                 }
                 // if nameserver ip address is invalid somehow?
