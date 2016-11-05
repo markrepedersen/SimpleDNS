@@ -118,7 +118,20 @@ public class DNSlookup {
             List<ResourceRecord> records = response.getRecords();
             for (ResourceRecord record : records) {
                 if (record.getType() == 0x01 && record.getName().equals(fqdn)) {
-                    
+                    // check if there is a record with the proper type that corresponds to the FQDN you were looking for
+                }
+                
+                else if (record.getType() == 0x05 && record.getName().equals(fqdn)) {
+                    // if not, check if there is a CNAME record that corresponds to the FQDN you were looking for,
+                    // and if so repeat the process (recursively) with that name
+                }
+                
+                else {
+                    // if not, select a potential nameserver, and if its address is in the additional
+                    // information (or is known to you through other means), repeat the query (recursively) to this new nameserver;
+                    // if the address of the nameserver is unknown, make a new query for the nameserver's name (recursively) using
+                    // the root nameserver, then use the result as a nameserver to repeat the original query (recursively);
+                    // if there is no nameserver, return an error.
                 }
             }
         } catch (SocketException e) {
