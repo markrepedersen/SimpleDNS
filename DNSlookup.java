@@ -119,7 +119,7 @@ public class DNSlookup {
             sendQuery(socket, rootNameServer, fqdn);
             while (queryCount != MAX_NUM_QUERIES) {
                 if (queryCount > 0) {
-                    sendQuery(socket, nameServer, fqdn);
+                    //sendQuery(socket, nameServer, fqdn);
                 }
                 DNSResponse response = receiveResponse(socket);
                 List<ResourceRecord> records = response.getRecords();

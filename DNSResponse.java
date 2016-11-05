@@ -51,7 +51,7 @@ public class DNSResponse {
         int pos = start;
         boolean isOnPointer = false;
         int lastPos = 0;     // last position in array (this is for when our position is changed with pointers)
-        for (int i = pos; i < 255; i++) {   // 255 max size (in bytes) of a domain name
+        for (int i = pos; i < data.length; i++) {   // 255 max size (in bytes) of a domain name
             if (data[pos] == (byte) 0x00) { // indicates end of name
                 if (!isOnPointer) { // if not on pointer when byte is zero, return domain name
                     break;
@@ -71,10 +71,11 @@ public class DNSResponse {
                 pos++;
             }
             else { // pointer
+                if (!isOnPointer) {
+                    lastPos = pos + 2;
+                }
                 isOnPointer = true;
-                lastPos = pos + 2;
                 pos = (((data[pos] & 0b0011_1111) & 0xff) << 8) | (data[pos + 1] & 0xff);
-                
             }
         }
         position = pos;
@@ -148,7 +149,7 @@ public class DNSResponse {
     
     public void addRecord(byte[] data, int position) {
         String name = readFQDN(data, position); //this method already increments position for us
-        position = this.position;
+        position = this.position - 1;
         int type = ((data[position] << 8) + (data[position + 1] & 0xff));
         position += 2;
         int clss = ((data[position] << 8) + (data[position + 1] & 0xff));
@@ -164,6 +165,7 @@ public class DNSResponse {
             position++;
         }
         resourceRecords.add(new ResourceRecord(name, type, clss, ttl, RDLength, RData));
+        this.position = position;
     }
     
     
