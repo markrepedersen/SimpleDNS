@@ -31,6 +31,21 @@ public class DNSResponse {
     private boolean authoritative = false;// Is this an authoritative record
     private int QType;
     private int QClass;
+    long startTime;
+    
+   public void setTime(){
+	   startTime = System.currentTimeMillis();
+    }
+   
+  public boolean isExpiredTime(){
+	
+	 if( System.currentTimeMillis()-startTime<500){
+		 return true;
+	 }
+	 else
+	  return false;
+	   
+   }
     
     // Note you will almost certainly need some additional instance variables.
     
@@ -73,6 +88,7 @@ public class DNSResponse {
                 isOnPointer = true;
                 lastPos = pos + 2;
                 pos = ((((data[pos] << 8) + (data[pos + 1] & 0xff)) << 2) >> 2);
+                
                 
             }
         }
@@ -157,7 +173,7 @@ public class DNSResponse {
         position += 2;
         byte[] RData = new byte[RDLength];
         for (int j = 0; j < RDLength; j++) {
-            RData[j] = data[position];
+            RData[j] =data[position];
             position++;
         }
         resourceRecords.add(new ResourceRecord(name, type, clss, ttl, RDLength, RData));
