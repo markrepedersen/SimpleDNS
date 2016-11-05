@@ -75,6 +75,7 @@ public class DNSResponse {
                 if (!isOnPointer) { // if not on pointer when byte is zero, return domain name
                     break;
                 }
+                isOnPointer = false;
                 pos = lastPos;      // else return to last position
             }
             else if ((data[pos] & 0b1100_0000) == (byte) 0x00) { // regular label
@@ -91,7 +92,7 @@ public class DNSResponse {
             else { // pointer
                 isOnPointer = true;
                 lastPos = pos + 2;
-                pos = ((((data[pos] << 8) + (data[pos + 1] & 0xff)) << 2) >> 2);
+                pos = (((data[pos] & 0b0011_1111) & 0xff) << 8) | (data[pos + 1] & 0xff);
                 
                 
             }
@@ -110,6 +111,7 @@ public class DNSResponse {
         for (int i = 0; i < b.length; i++) {
             b[i] = buf[i];
         }
+        position++;
         return new String(b);
     }
     
@@ -166,6 +168,7 @@ public class DNSResponse {
     
     public void addRecord(byte[] data, int position) {
         String name = readFQDN(data, position); //this method already increments position for us
+        position = this.position;
         int type = ((data[position] << 8) + (data[position + 1] & 0xff));
         position += 2;
         int clss = ((data[position] << 8) + (data[position + 1] & 0xff));
