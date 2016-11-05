@@ -3,8 +3,6 @@
  */
 
 import java.io.ByteArrayInputStream;
-import java.net.InetAddress;
-import java.net.UnknownHostException;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.List;
@@ -16,7 +14,6 @@ import java.util.List;
 // parsed from the response. If you decide to use this class keep in mind that it is just a
 // suggestion and feel free to add or delete methods to better suit your implementation as
 // well as instance variables.
-
 
 
 public class DNSResponse {
@@ -35,6 +32,7 @@ public class DNSResponse {
     private boolean authoritative = false;// Is this an authoritative record
     private int QType;
     private int QClass;
+    private byte[] data;
     
     // Note you will almost certainly need some additional instance variables.
     
@@ -79,6 +77,10 @@ public class DNSResponse {
         return nsRecords;
     }
     
+    public byte[] getData() {
+        return data;
+    }
+    
     // if a name server is found and its address is in additional section, return this record
     // return any ns if no mapping found
     // O(n^2) performance can hopefully be ignored, since only small amount of records
@@ -110,8 +112,7 @@ public class DNSResponse {
                 }
                 isOnPointer = false;
                 pos = lastPos;      // else return to last position
-            }
-            else if ((data[pos] & 0b1100_0000) == (byte) 0x00) { // regular label
+            } else if ((data[pos] & 0b1100_0000) == (byte) 0x00) { // regular label
                 amountToRead = (int) data[pos];
                 for (int j = 0; j < amountToRead; j++) {
                     pos++;
@@ -121,8 +122,7 @@ public class DNSResponse {
                 buf[endOfBuffer] = (byte) 0x2e;
                 endOfBuffer++;
                 pos++;
-            }
-            else { // pointer
+            } else { // pointer
                 if (!isOnPointer) {
                     lastPos = pos + 2;
                 }
@@ -146,10 +146,66 @@ public class DNSResponse {
         return new String(b);
     }
     
+    //Helper method for reading the sequence of bytes interpreted as the FQDN
+    public static String readFQDN(byte[] data, byte[] rdata, int start) {
+        byte[] buf = new byte[255]; // buffer representing a fqdn with length max size of a domain name
+        int endOfBuffer = 0; // the first empty position in buffer
+        int amountToRead;   // the integer before a label indicating how long the label is
+        int pos = start;
+        byte[] lastRData = null;
+        boolean isOnPointer = false;
+        int lastPos = 0;     // last position in array (this is for when our position is changed with pointers)
+        for (int i = pos; i < rdata.length; i++) {   // 255 max size (in bytes) of a domain name
+            if (rdata[pos] == (byte) 0x00) { // indicates end of name
+                if (!isOnPointer) { // if not on pointer when byte is zero, return domain name
+                    break;
+                }
+                isOnPointer = false;
+                pos = lastPos;      // else return to last position
+                rdata = lastRData;
+            }
+            
+            else if ((rdata[pos] & 0b1100_0000) == (byte) 0x00) { // regular label
+                amountToRead = (int) rdata[pos];
+                for (int j = 0; j < amountToRead; j++) {
+                    pos++;
+                    buf[endOfBuffer] = rdata[pos];
+                    endOfBuffer++;
+                }
+                buf[endOfBuffer] = (byte) 0x2e;
+                endOfBuffer++;
+                pos++;
+                
+            } else { // pointer
+                if (!isOnPointer) {
+                    lastPos = pos + 2;
+                }
+                lastRData = rdata;
+                rdata = data;
+                isOnPointer = true;
+                pos = (((rdata[pos] & 0b0011_1111) & 0xff) << 8) | (rdata[pos + 1] & 0xff);
+            }
+        }
+        position = pos;
+        int count = 0;
+        for (int i = 0; i < buf.length; i++) {
+            if (buf[i] == 0) {
+                break;
+            }
+            count++;
+        }
+        byte[] b = new byte[count - 1];
+        for (int i = 0; i < b.length; i++) {
+            b[i] = buf[i];
+        }
+        position++;
+        return new String(b);
+    }
+    
     // The constructor: you may want to add additional parameters, but the two shown are
     // probably the minimum that you need.
     
-    public DNSResponse (byte[] data, int len) {
+    public DNSResponse(byte[] data, int len) {
         ByteArrayInputStream in = new ByteArrayInputStream(data);
         // The following are probably some of the things
         // you will need to do.
@@ -166,7 +222,7 @@ public class DNSResponse {
         
         // Extract list of answers, name server, and additional information response
         // records
-        
+        this.data = data;
         byte b = data[4];
         if ((b & (byte) 0x01) != (byte) 0x00) {   //response code indicates error
             return; // error - return -1 or smth
