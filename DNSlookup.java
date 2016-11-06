@@ -169,6 +169,9 @@ public class DNSlookup {
                     DNSResponse response = receiveResponse(socket);
                     if (tracingOn) {
                         response.dumpResponse();
+                        if (response.answerFQDN.equals(nameBeingLookUp)){
+                        	break;
+                        }
                     }
                     if (response.getAnswerCount() != 0) {
                         for (ResourceRecord record : response.getAnsRecords()) {

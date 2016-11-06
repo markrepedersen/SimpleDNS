@@ -35,11 +35,13 @@ public class DNSResponse {
     private int QType;
     private int QClass;
     private byte[] data;
+    public String answerFQDN="";
     
     // Note you will almost certainly need some additional instance variables.
     
     public int getQueryID() {
         return queryID;
+        
     }
     
     // When in trace mode you probably want to dump out all the relevant information in a response
@@ -48,6 +50,7 @@ public class DNSResponse {
         System.out.println("  Answers " + answerCount);
         for (ResourceRecord record : ansRecords) {
             printHelper(record);
+            answerFQDN= record.getName();
         }
         System.out.println("  Nameservers " + nsCount);
         for (ResourceRecord record : nsRecords) {
@@ -238,10 +241,10 @@ public class DNSResponse {
                 
             } else { // pointer
                 if (!isOnPointer) {
+                    lastRData = rdata;
                     lastPos = pos + 2;
                 }
                 pos = (((rdata[pos] & 0b0011_1111) & 0xff) << 8) | (rdata[pos + 1] & 0xff);
-                lastRData = rdata;
                 rdata = data;
                 isOnPointer = true;
             }
