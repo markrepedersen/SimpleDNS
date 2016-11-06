@@ -71,7 +71,6 @@ public class DNSlookup {
         byte[] query = new byte[2];
         r.nextBytes(query);
         queryID = ((query[0] << 8) + (query[1] & 0xff));
-        System.out.println(queryID);
         
         byte[] prefix = {query[0], query[1], (byte) 0x00, (byte) 0x00, (byte) 0x00, (byte) 0x01, (byte) 0x00,
             (byte) 0x00, (byte) 0x00, (byte) 0x00, (byte) 0x00, (byte) 0x00};
@@ -119,8 +118,14 @@ public class DNSlookup {
             int queryCount = 0;
             while (queryCount != MAX_NUM_QUERIES) {
                 sendQuery(socket, rootNameServer, fqdn);
+                if (tracingOn) {
+                    System.out.println("\n\nQuery ID     " + queryID + " -> " + rootNameServer.getHostAddress());
+                }
                 try {
                     DNSResponse response = receiveResponse(socket);
+                    if (tracingOn) {
+                        response.dumpResponse();
+                    }
                     if (response.getAnswerCount() != 0) {
                         for (ResourceRecord record : response.getAnsRecords()) {
                             if (record.getType() == 0x05 && record.getName().equals(fqdn)) {

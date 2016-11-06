@@ -3,6 +3,8 @@
  */
 
 import java.io.ByteArrayInputStream;
+import java.net.InetAddress;
+import java.net.UnknownHostException;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.List;
@@ -36,10 +38,65 @@ public class DNSResponse {
     
     // Note you will almost certainly need some additional instance variables.
     
-    // When in trace mode you probably want to dump out all the relevant information in a response
-    
-    void dumpResponse() {
+    public int getQueryID() {
+        return queryID;
     }
+    
+    // When in trace mode you probably want to dump out all the relevant information in a response
+    void dumpResponse() {
+        System.out.println("Response ID: " + queryID + " Authoritative " + authoritative);
+        System.out.println("  Answers " + answerCount);
+        for (ResourceRecord record : ansRecords) {
+            printHelper(record);
+        }
+        System.out.println("  Nameservers " + nsCount);
+        for (ResourceRecord record : nsRecords) {
+            printHelper(record);
+        }
+        System.out.println("  Additional Information " + additionalCount);
+        for (ResourceRecord record : additionalRecords) {
+            printHelper(record);
+        }
+    }
+    
+    String convertToIP(byte[] data) throws UnknownHostException {
+        return InetAddress.getByAddress(data).getHostAddress();
+    }
+    
+    public void printHelper(ResourceRecord record) {
+        String type = null;
+        String rdata = null;
+        int ttl = record.getTTL();
+        try {
+            switch (record.getType()) {
+                case 0x01:
+                    type = "A";
+                    rdata = convertToIP(record.getRData());
+                    break;
+                case 0x02:
+                    type = "NS";
+                    rdata = readFQDN(data, record.getRData(), 0);
+                    break;
+                case 0x05:
+                    type = "CN";
+                    rdata = readFQDN(data, record.getRData(), 0);
+                    break;
+                case 28:
+                    type = "AAAA";
+                    rdata = convertToIP(record.getRData());
+                    break;
+                default:
+                    type = String.valueOf(record.getType());
+                    rdata = "";
+            }
+        }
+        catch (UnknownHostException e) {
+            ttl = -4;
+        }
+        System.out.format("       %-30s %-10d %-4s %s\n", record.getName(), ttl, type, rdata);
+    }
+    
+    
     
     public List<ResourceRecord> getRecords() {
         return resourceRecords;
@@ -230,16 +287,12 @@ public class DNSResponse {
         if ((b & (byte) 0x01) != (byte) 0x00) {   //response code indicates error
             return; // error - return -1 or smth
         }
+        queryID = ((data[0] << 8) + (data[1] & 0xff));
         authoritative = (data[2] & 0b0000_0100) == 0b0000_0100;
-        System.out.println(authoritative);
         QDCount = ((data[4] << 8) + (data[5] & 0xff));
-        System.out.println(QDCount);
         answerCount = ((data[6] << 8) + (data[7] & 0xff));
-        System.out.println(answerCount);
         nsCount = ((data[8] << 8) + (data[9] & 0xff));
-        System.out.println(nsCount);
         additionalCount = ((data[10] << 8) + (data[11] & 0xff));
-        System.out.println(additionalCount);
         qName = readFQDN(data, 12);
         QType = ((data[position] << 8) + (data[position + 1] & 0xff));
         position += 2;
