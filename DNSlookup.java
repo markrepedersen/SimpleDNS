@@ -21,11 +21,14 @@ public class DNSlookup {
     private static boolean tracingOn = false;
     private static InetAddress rootNameServer;
     private static int queryID;
+    private static byte[] idInBytes = new byte[2];
     private static int MAX_NUM_QUERIES = 30;
     private static InetAddress nameServer;
     private static int numTimeOuts = 0;
     private static String nameBeingLookUp;
-    private static boolean getOuttaHere = false;
+    private static int minTTL = Integer.MAX_VALUE;
+    private static boolean onRecursion = false;
+    private static boolean isTimeOut = false;
     
     
     // sends a query (to root name server as of now) where
@@ -48,28 +51,23 @@ public class DNSlookup {
             //The name server was unable to interpret the query.
             System.out.println(nameBeingLookUp + " -4 " + "0.0.0.0");
             System.exit(1);
-        }
-        else if ((data[3] & 0b0000_1111) == 0b0000_0010) {
+        } else if ((data[3] & 0b0000_1111) == 0b0000_0010) {
             //Server failure -
             //The name server was unable to process this query due to a problem with the name server.
             System.out.println(nameBeingLookUp + " -4 " + "0.0.0.0");
             System.exit(1);
-        }
-        else if ((data[3] & 0b0000_1111) == 0b0000_0011) {
+        } else if ((data[3] & 0b0000_1111) == 0b0000_0011) {
             //Name Error -
             //Meaningful only for responses from an authoritative name server,
             //this code signifies that the domain name referenced in the query does not exist
             System.out.println(nameBeingLookUp + " -1 " + "0.0.0.0");
             System.exit(1);
-        }
-        
-        else if ((data[3] & 0b0000_1111) == 0b0000_0100) {
+        } else if ((data[3] & 0b0000_1111) == 0b0000_0100) {
             //Not Implemented -
             //The name server does not support the requested kind of query.
             System.out.println(nameBeingLookUp + " -4 " + "0.0.0.0");
             System.exit(1);
-        }
-        else if ((data[3] & 0b0000_1111) == 0b0000_0101) {
+        } else if ((data[3] & 0b0000_1111) == 0b0000_0101) {
             //Refused -
             //The name server refuses to perform the specified operation for policy reasons.
             System.out.println(nameBeingLookUp + " -4 " + "0.0.0.0");
@@ -108,14 +106,22 @@ public class DNSlookup {
     private static byte[] convertDomainNameToDNSQuery(String fqdn) throws IOException {
         ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
         // Creates a random queryID between 0 - (2^16 - 1) inclusive
-        Random r = new Random();
-        byte[] query = new byte[2];
-        r.nextBytes(query);
-        queryID = ((query[0] << 8) + (query[1] & 0xff));
-        
-        byte[] prefix = {query[0], query[1], (byte) 0x00, (byte) 0x00, (byte) 0x00, (byte) 0x01, (byte) 0x00,
-            (byte) 0x00, (byte) 0x00, (byte) 0x00, (byte) 0x00, (byte) 0x00};
-        outputStream.write(prefix);
+        if (!isTimeOut) {
+            Random r = new Random();
+            idInBytes = new byte[2];
+            r.nextBytes(idInBytes);
+            queryID = ((idInBytes[0] << 8) + (idInBytes[1] & 0xff));
+            byte[] prefix = {idInBytes[0], idInBytes[1], (byte) 0x00, (byte) 0x00, (byte) 0x00, (byte) 0x01, (byte) 0x00,
+                (byte) 0x00, (byte) 0x00, (byte) 0x00, (byte) 0x00, (byte) 0x00};
+            outputStream.write(prefix);
+            
+        }
+        else {
+            byte[] prefix = {idInBytes[0], idInBytes[1], (byte) 0x00, (byte) 0x00, (byte) 0x00, (byte) 0x01, (byte) 0x00,
+                (byte) 0x00, (byte) 0x00, (byte) 0x00, (byte) 0x00, (byte) 0x00};
+            outputStream.write(prefix);
+            
+        }
         String[] strings = fqdn.split(Pattern.quote("."));
         convertToByteArray(outputStream, strings);
         byte[] postfix = {(byte) 0x00, (byte) 0x00, (byte) 0x01, (byte) 0x00, (byte) 0x01};
@@ -165,14 +171,15 @@ public class DNSlookup {
     
     private static InetAddress runDNSLookup(DatagramSocket socket, InetAddress rootNameServer, String fqdn, String[] args) throws IOException {
         int queryCount = 0;
-        String answerFQDN = fqdn;
         while (queryCount <= MAX_NUM_QUERIES) {
             sendQuery(socket, rootNameServer, fqdn);
             if (tracingOn) {
-                System.out.println("\n\nQuery ID     " + queryID + " " + fqdn + " -> " + rootNameServer.getHostAddress());
+                System.out.println("\n\nQuery ID     " + queryID + " " + fqdn + " --> " + rootNameServer.getHostAddress());
             }
             try {
                 DNSResponse response = receiveResponse(socket);
+                numTimeOuts = 0;
+                isTimeOut = false;
                 if (tracingOn) {
                     response.dumpResponse();
                 }
@@ -183,12 +190,22 @@ public class DNSlookup {
                             // and if so repeats the process (recursively) with that name
                             fqdn = DNSResponse.readFQDN(response.getData(), record.getRData(), 0);
                             rootNameServer = InetAddress.getByName(args[0]);
+                            minTTL = Math.min(record.getTTL(), minTTL);
                             break;
                         } else if (record.getName().equals(fqdn) && record.getType() == 0x01) {
-                            InetAddress answer = InetAddress.getByAddress(record.getRData());
-                            if (record.getName().equals(fqdn)) {
-                                System.out.printf("%s %d %s", answerFQDN, record.getTTL(), answer.toString().replace("/", ""));
+                            if (!onRecursion) {
+                                for (ResourceRecord minRec : response.getAnsRecords()) {
+                                    minTTL = Math.min(minTTL, minRec.getTTL());
+                                }
+                                for (ResourceRecord r : response.getAnsRecords()) {
+                                    System.out.printf("%s %d %s",
+                                                      fqdn,
+                                                      minTTL,
+                                                      InetAddress.getByAddress(r.getRData()).getHostAddress().replace("/", ""));
+                                    System.out.println("");
+                                }
                             }
+                            
                             return InetAddress.
                             getByAddress(record.getRData());
                         }
@@ -200,8 +217,11 @@ public class DNSlookup {
                         rootNameServer = InetAddress.getByAddress(ns.getRData());
                     } else {
                         // no match in additional section, must look up ns in a new query
+                        onRecursion = true;
                         String nsFQDN = DNSResponse.readFQDN(response.getData(), response.getFirstNSRecord().getRData(), 0);
                         rootNameServer = runDNSLookup(socket, InetAddress.getByName(args[0]), nsFQDN, args);
+                        onRecursion = false;
+                        
                     }
                 }
                 queryCount++;
@@ -214,6 +234,8 @@ public class DNSlookup {
                 // If you send a query and don't get a response in 5 seconds you are to
                 // resend the query to the same name server. If you still don't get a response
                 // you are to indicate that the name could not be looked up by reporting a TTL of -2 and host ID of 0.0.0.0
+                numTimeOuts++;
+                isTimeOut = true;
                 if (numTimeOuts == 2) {
                     System.out.println(nameBeingLookUp + " -2 " + "0.0.0.0");
                     break;
@@ -221,7 +243,7 @@ public class DNSlookup {
             }
             // if nameserver ip address is invalid somehow?
             catch (UnknownHostException e) {
-                // throw some error
+                
             }
         }
         return null;
