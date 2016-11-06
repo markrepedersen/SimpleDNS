@@ -238,10 +238,10 @@ public class DNSResponse {
                 
             } else { // pointer
                 if (!isOnPointer) {
+                    lastRData = rdata;
                     lastPos = pos + 2;
                 }
                 pos = (((rdata[pos] & 0b0011_1111) & 0xff) << 8) | (rdata[pos + 1] & 0xff);
-                lastRData = rdata;
                 rdata = data;
                 isOnPointer = true;
             }
