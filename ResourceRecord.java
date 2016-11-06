@@ -14,6 +14,7 @@ public class ResourceRecord {
     public int getType() {
         return type;
     }
+<<<<<<< HEAD
     
     public byte[] getRData() {
         return rData;
@@ -27,6 +28,20 @@ public class ResourceRecord {
         return ttl;
     }
     
+=======
+
+    public byte[] getRData() {
+        return rData;
+    }
+
+    public String getName() {
+        return name;
+    }
+
+    public int getTTL() {
+        return ttl;
+    }
+>>>>>>> 285bbfad845b01d09f44605363a4a88764ca920b
     public ResourceRecord(String name, int type, int clss, int ttl, int RDLength, byte[] rData) {
         this.name = name;
         this.type = type;
