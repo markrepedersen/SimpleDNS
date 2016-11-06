@@ -47,35 +47,33 @@ public class DNSlookup {
             //Format error -
             //The name server was unable to interpret the query.
             System.out.println(nameBeingLookUp + " -4 " + "0.0.0.0");
-            throw new Error();
-            
+            System.exit(1);
         }
-        if ((data[3] & 0b0000_1111) == 0b0000_0010) {
+        else if ((data[3] & 0b0000_1111) == 0b0000_0010) {
             //Server failure -
             //The name server was unable to process this query due to a problem with the name server.
             System.out.println(nameBeingLookUp + " -4 " + "0.0.0.0");
-            throw new Error();
+            System.exit(1);
         }
-        if ((data[3] & 0b0000_1111) == 0b0000_0011) {
+        else if ((data[3] & 0b0000_1111) == 0b0000_0011) {
             //Name Error -
             //Meaningful only for responses from an authoritative name server,
             //this code signifies that the domain name referenced in the query does not exist
             System.out.println(nameBeingLookUp + " -1 " + "0.0.0.0");
-            throw new Error();
+            System.exit(1);
         }
         
-        if ((data[3] & 0b0000_1111) == 0b0000_0100) {
+        else if ((data[3] & 0b0000_1111) == 0b0000_0100) {
             //Not Implemented -
             //The name server does not support the requested kind of query.
             System.out.println(nameBeingLookUp + " -4 " + "0.0.0.0");
-            throw new Error();
-            
+            System.exit(1);
         }
-        if ((data[3] & 0b0000_1111) == 0b0000_0101) {
+        else if ((data[3] & 0b0000_1111) == 0b0000_0101) {
             //Refused -
             //The name server refuses to perform the specified operation for policy reasons.
             System.out.println(nameBeingLookUp + " -4 " + "0.0.0.0");
-            throw new Error();
+            System.exit(1);
         }
         
         
@@ -160,12 +158,9 @@ public class DNSlookup {
             // else SocketTimeOutException thrown
             socket.setSoTimeout(5000);
             runDNSLookup(socket, rootNameServer, fqdn, args);
-        } catch (SocketException e) {
-            //do something
-        } catch (IOException e) {
-            //do something
+        } catch (Exception e) {
+            System.out.printf("%s -4 0.0.0.0", fqdn);
         }
-        
     }
     
     private static InetAddress runDNSLookup(DatagramSocket socket, InetAddress rootNameServer, String fqdn, String[] args) throws IOException {
@@ -192,7 +187,7 @@ public class DNSlookup {
                         } else if (record.getName().equals(fqdn) && record.getType() == 0x01) {
                             InetAddress answer = InetAddress.getByAddress(record.getRData());
                             if (record.getName().equals(fqdn)) {
-                                System.out.printf("%s %d %s", answerFQDN, record.getTTL(), answer);
+                                System.out.printf("%s %d %s", answerFQDN, record.getTTL(), answer.toString().replace("/", ""));
                             }
                             return InetAddress.
                             getByAddress(record.getRData());
@@ -213,7 +208,7 @@ public class DNSlookup {
                 //Throw error if queryCount exceeds MAX
                 if (queryCount > MAX_NUM_QUERIES) {
                     System.out.println(nameBeingLookUp + " -3 " + "0.0.0.0");
-                    throw new Error();
+                    break;
                 }
             } catch (SocketTimeoutException e) {
                 // If you send a query and don't get a response in 5 seconds you are to
@@ -221,7 +216,7 @@ public class DNSlookup {
                 // you are to indicate that the name could not be looked up by reporting a TTL of -2 and host ID of 0.0.0.0
                 if (numTimeOuts == 2) {
                     System.out.println(nameBeingLookUp + " -2 " + "0.0.0.0");
-                    throw new Error();
+                    break;
                 }
             }
             // if nameserver ip address is invalid somehow?
