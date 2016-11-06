@@ -199,7 +199,7 @@ public class DNSlookup {
                                 }
                                 for (ResourceRecord r : response.getAnsRecords()) {
                                     System.out.printf("%s %d %s",
-                                                      fqdn,
+                                                      nameBeingLookUp,
                                                       minTTL,
                                                       InetAddress.getByAddress(r.getRData()).getHostAddress().replace("/", ""));
                                     System.out.println("");

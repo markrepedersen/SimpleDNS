@@ -41,7 +41,6 @@ public class DNSResponse {
     
     public int getQueryID() {
         return queryID;
-        
     }
     
     // When in trace mode you probably want to dump out all the relevant information in a response
