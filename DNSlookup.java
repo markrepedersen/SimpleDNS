@@ -28,6 +28,7 @@ public class DNSlookup {
     private static int numTimeOuts = 0;
     private static String nameBeingLookUp;
     
+    
     // sends a query (to root name server as of now) where
     // - address is ip address of name server
     // - fqdn is fully qualified domain name that is to be resolved
@@ -39,9 +40,7 @@ public class DNSlookup {
         DatagramPacket packet = new DatagramPacket(dnsQuery, dnsQuery.length, address, 53);
         socket.send(packet);
     }
-
-  
-    //Check for specific Rcode errors
+  //Check for specific Rcode errors
     private static void checkRcode(byte[] data) throws UnknownHostException  {
 		
 		if((data[3]& 0b0000_1111) == 0b0000_0001){
@@ -81,7 +80,7 @@ public class DNSlookup {
 
     	
 	}
-
+    
     private static DNSResponse receiveResponse(DatagramSocket socket) throws IOException {
         // **** if no response within 5 secs, resend packet *****
         // ******** if still no response, throw exception/print error code
@@ -104,7 +103,6 @@ public class DNSlookup {
         if ((data[2] & 0b0000_0010) == 0b0000_0010) { //response is truncated
             // report error
         }
-        
         checkRcode(data);
         return new DNSResponse(data, data.length);
     }
@@ -116,7 +114,6 @@ public class DNSlookup {
         byte[] query = new byte[2];
         r.nextBytes(query);
         queryID = ((query[0] << 8) + (query[1] & 0xff));
-        System.out.println(queryID);
         
         byte[] prefix = {query[0], query[1], (byte) 0x00, (byte) 0x00, (byte) 0x00, (byte) 0x01, (byte) 0x00,
             (byte) 0x00, (byte) 0x00, (byte) 0x00, (byte) 0x00, (byte) 0x00};
@@ -149,8 +146,8 @@ public class DNSlookup {
         }
         
         rootNameServer = InetAddress.getByName(args[0]);
-        fqdn = args[1];
         nameBeingLookUp=args[1];
+        fqdn = args[1];
         
         if (argCount == 3 && args[2].equals("-t"))
             tracingOn = true;
@@ -165,8 +162,14 @@ public class DNSlookup {
             int queryCount = 0;
             while (queryCount != MAX_NUM_QUERIES) {
                 sendQuery(socket, rootNameServer, fqdn);
+                if (tracingOn) {
+                    System.out.println("\n\nQuery ID     " + queryID + " -> " + rootNameServer.getHostAddress());
+                }
                 try {
                     DNSResponse response = receiveResponse(socket);
+                    if (tracingOn) {
+                        response.dumpResponse();
+                    }
                     if (response.getAnswerCount() != 0) {
                         for (ResourceRecord record : response.getAnsRecords()) {
                             if (record.getType() == 0x05 && record.getName().equals(fqdn)) {
@@ -214,8 +217,6 @@ public class DNSlookup {
                     if (numTimeOuts == 2) {
             			System.out.println(nameBeingLookUp+ " -2 " +"0.0.0.0");
             			throw new Error();	
-/*                        System.out.printf("%s -2 0.0.0.0", fqdn);
-                        break;*/
                     }
                 }
                 // if nameserver ip address is invalid somehow?
@@ -240,3 +241,4 @@ public class DNSlookup {
         System.out.println("       -t      -trace the queries made and responses received");
     }
 }
+
