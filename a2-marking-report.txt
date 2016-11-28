@@ -1,9 +1,9 @@
-Total before late penalty: [/58]
+Total before late penalty: [54/58]
 
 NOTE: in the marking report something left blank (e.g.  [ /6]) typically means
 that you got full marks for that item. 
 
-Functionality: [/28]
+Functionality: [25/28]
 
    [/2] Basic query to a name server that is authoritative.
    	(e.g. www.cs.ubc.ca to 198.162.35.1)
@@ -21,8 +21,19 @@ Functionality: [/28]
    [/3] A complicated lookup series that potentially involves multiple
    cnames and DNS server name lookups (finance.google.ca)
 
-   [/3] Can deal with information in the additional information
+   [0/3] Can deal with information in the additional information
    section when not all of it is of interest/use (e.g. groups.yahoo.com)
+
+   marker: does not handle the case properly. This is what I get:
+   $ java -jar DNSlookup.jar 192.112.36.4 groups.yahoo.com
+     groups.yahoo.com -4 0.0.0.0
+
+   while correct output is:
+   $ java -jar DNSlookup.jar 192.112.36.4 groups.yahoo.com
+     groups.yahoo.com 300 216.115.100.124
+     groups.yahoo.com 300 216.115.100.123
+     groups.yahoo.com 300 208.71.44.30
+     groups.yahoo.com 300 208.71.44.31
 
    [/3] Can deal with unconventional but valid response records for
    example uncompressed RR names, compression of the query name.
@@ -69,16 +80,22 @@ Tracing: [/13]
 
   [/1] Prints TTL
 
-Broad Marking Criteria :                     [/9] 
+Broad Marking Criteria :                     [8/9] 
 See below for a detailed description of
 this marking criteria
-     Readability        [/3]
-     Code Documentation [/3]
-     Code Quality       [/3]
+     Readability        [2/3]
+     Code Documentation [3/3]
+     Code Quality       [3/3]
 
+marker: overall, well done. The only problem is lines exceed 80
+characters limit. It is true accross entire source and makes code less
+readable.
 
 MARKER'S ADDITIONAL COMMENTS:
 
+I read your note on README and I see your post-deadline change is
+indeed minor.  Always proof read your code and double check execution
+before submission.
 
 
 ----------------------- Non Functional Criteria
